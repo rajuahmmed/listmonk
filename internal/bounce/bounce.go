@@ -11,13 +11,6 @@ import (
 	"github.com/knadh/listmonk/models"
 )
 
-const (
-	// subID is the identifying subscriber ID header to look for in
-	// bounced e-mails.
-	subID  = "X-Listmonk-Subscriber"
-	campID = "X-Listmonk-Campaign"
-)
-
 // Mailbox represents a POP/IMAP mailbox client that can scan messages and pass
 // them to a given channel.
 type Mailbox interface {
@@ -33,19 +26,30 @@ type Opt struct {
 	SESEnabled      bool        `json:"ses_enabled"`
 	SendgridEnabled bool        `json:"sendgrid_enabled"`
 	SendgridKey     string      `json:"sendgrid_key"`
+	Postmark        struct {
+		Enabled  bool
+		Username string
+		Password string
+	}
+	ForwardEmail struct {
+		Enabled bool
+		Key     string
+	}
 
 	RecordBounceCB func(models.Bounce) error
 }
 
 // Manager handles e-mail bounces.
 type Manager struct {
-	queue    chan models.Bounce
-	mailbox  Mailbox
-	SES      *webhooks.SES
-	Sendgrid *webhooks.Sendgrid
-	queries  *Queries
-	opt      Opt
-	log      *log.Logger
+	queue        chan models.Bounce
+	mailbox      Mailbox
+	SES          *webhooks.SES
+	Sendgrid     *webhooks.Sendgrid
+	Postmark     *webhooks.Postmark
+	Forwardemail *webhooks.Forwardemail
+	queries      *Queries
+	opt          Opt
+	log          *log.Logger
 }
 
 // Queries contains the queries.
@@ -77,6 +81,7 @@ func New(opt Opt, q *Queries, lo *log.Logger) (*Manager, error) {
 		if opt.SESEnabled {
 			m.SES = webhooks.NewSES()
 		}
+
 		if opt.SendgridEnabled {
 			sg, err := webhooks.NewSendgrid(opt.SendgridKey)
 			if err != nil {
@@ -84,6 +89,15 @@ func New(opt Opt, q *Queries, lo *log.Logger) (*Manager, error) {
 			} else {
 				m.Sendgrid = sg
 			}
+		}
+
+		if opt.Postmark.Enabled {
+			m.Postmark = webhooks.NewPostmark(opt.Postmark.Username, opt.Postmark.Password)
+		}
+
+		if opt.ForwardEmail.Enabled {
+			fe := webhooks.NewForwardemail([]byte(opt.ForwardEmail.Key))
+			m.Forwardemail = fe
 		}
 	}
 
@@ -97,20 +111,13 @@ func (m *Manager) Run() {
 		go m.runMailboxScanner()
 	}
 
-	for {
-		select {
-		case b, ok := <-m.queue:
-			if !ok {
-				return
-			}
+	for b := range m.queue {
+		if b.CreatedAt.IsZero() {
+			b.CreatedAt = time.Now()
+		}
 
-			if b.CreatedAt.IsZero() {
-				b.CreatedAt = time.Now()
-			}
-
-			if err := m.opt.RecordBounceCB(b); err != nil {
-				continue
-			}
+		if err := m.opt.RecordBounceCB(b); err != nil {
+			continue
 		}
 	}
 }
@@ -128,8 +135,6 @@ func (m *Manager) runMailboxScanner() {
 
 // Record records a new bounce event given the subscriber's email or UUID.
 func (m *Manager) Record(b models.Bounce) error {
-	select {
-	case m.queue <- b:
-	}
+	m.queue <- b
 	return nil
 }

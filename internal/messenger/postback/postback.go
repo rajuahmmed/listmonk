@@ -5,19 +5,19 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/textproto"
 	"time"
 
-	"github.com/knadh/listmonk/internal/messenger"
 	"github.com/knadh/listmonk/models"
 )
 
 // postback is the payload that's posted as JSON to the HTTP Postback server.
+//
 //easyjson:json
 type postback struct {
 	Subject     string       `json:"subject"`
+	FromEmail   string       `json:"from_email"`
 	ContentType string       `json:"content_type"`
 	Body        string       `json:"body"`
 	Recipients  []recipient  `json:"recipients"`
@@ -34,11 +34,11 @@ type campaign struct {
 }
 
 type recipient struct {
-	UUID    string                   `json:"uuid"`
-	Email   string                   `json:"email"`
-	Name    string                   `json:"name"`
+	UUID    string      `json:"uuid"`
+	Email   string      `json:"email"`
+	Name    string      `json:"name"`
 	Attribs models.JSON `json:"attribs"`
-	Status  string                   `json:"status"`
+	Status  string      `json:"status"`
 }
 
 type attachment struct {
@@ -94,9 +94,10 @@ func (p *Postback) Name() string {
 }
 
 // Push pushes a message to the server.
-func (p *Postback) Push(m messenger.Message) error {
+func (p *Postback) Push(m models.Message) error {
 	pb := postback{
 		Subject:     m.Subject,
+		FromEmail:   m.From,
 		ContentType: m.ContentType,
 		Body:        string(m.Body),
 		Recipients: []recipient{{
@@ -129,6 +130,7 @@ func (p *Postback) Push(m messenger.Message) error {
 			copy(a.Content, f.Content)
 			files = append(files, a)
 		}
+		pb.Attachments = files
 	}
 
 	b, err := pb.MarshalJSON()
@@ -147,6 +149,7 @@ func (p *Postback) Flush() error {
 // Close closes idle HTTP connections.
 func (p *Postback) Close() error {
 	p.c.CloseIdleConnections()
+
 	return nil
 }
 
@@ -190,13 +193,14 @@ func (p *Postback) exec(method, rURL string, reqBody []byte, headers http.Header
 		req.URL.RawQuery = string(reqBody)
 	}
 
+	// Execute the request.
 	r, err := p.c.Do(req)
 	if err != nil {
 		return err
 	}
 	defer func() {
 		// Drain and close the body to let the Transport reuse the connection
-		io.Copy(ioutil.Discard, r.Body)
+		io.Copy(io.Discard, r.Body)
 		r.Body.Close()
 	}()
 

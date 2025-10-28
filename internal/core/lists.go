@@ -3,17 +3,23 @@ package core
 import (
 	"net/http"
 
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/knadh/listmonk/models"
 	"github.com/labstack/echo/v4"
 	"github.com/lib/pq"
 )
 
+type listType struct {
+	ID   int    `json:"id"`
+	UUID string `json:"uuid"`
+	Type string `json:"type"`
+}
+
 // GetLists gets all lists optionally filtered by type.
-func (c *Core) GetLists(typ string) ([]models.List, error) {
+func (c *Core) GetLists(typ string, getAll bool, permittedIDs []int) ([]models.List, error) {
 	out := []models.List{}
 
-	if err := c.q.GetLists.Select(&out, typ, "id"); err != nil {
+	if err := c.q.GetLists.Select(&out, typ, "id", getAll, pq.Array(permittedIDs)); err != nil {
 		c.log.Printf("error fetching lists: %v", err)
 		return nil, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.lists}", "error", pqErrMsg(err)))
@@ -36,12 +42,18 @@ func (c *Core) GetLists(typ string) ([]models.List, error) {
 
 // QueryLists gets multiple lists based on multiple query params. Along with the  paginated and sliced
 // results, the total number of lists in the DB is returned.
-func (c *Core) QueryLists(searchStr, orderBy, order string, offset, limit int) ([]models.List, int, error) {
-	out := []models.List{}
+func (c *Core) QueryLists(searchStr, typ, optin string, tags []string, orderBy, order string, getAll bool, permittedIDs []int, offset, limit int) ([]models.List, int, error) {
+	_ = c.refreshCache(matListSubStats, false)
 
-	queryStr, stmt := makeSearchQuery(searchStr, orderBy, order, c.q.QueryLists)
+	if tags == nil {
+		tags = []string{}
+	}
 
-	if err := c.db.Select(&out, stmt, 0, "", queryStr, offset, limit); err != nil {
+	var (
+		out            = []models.List{}
+		queryStr, stmt = makeSearchQuery(searchStr, orderBy, order, c.q.QueryLists, listQuerySortFields)
+	)
+	if err := c.db.Select(&out, stmt, 0, "", queryStr, typ, optin, pq.StringArray(tags), getAll, pq.Array(permittedIDs), offset, limit); err != nil {
 		c.log.Printf("error fetching lists: %v", err)
 		return nil, 0, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.lists}", "error", pqErrMsg(err)))
@@ -56,11 +68,6 @@ func (c *Core) QueryLists(searchStr, orderBy, order string, offset, limit int) (
 			if l.Tags == nil {
 				out[i].Tags = []string{}
 			}
-
-			// Total counts.
-			for _, c := range l.SubscriberCounts {
-				out[i].SubscriberCount += c
-			}
 		}
 	}
 
@@ -69,14 +76,14 @@ func (c *Core) QueryLists(searchStr, orderBy, order string, offset, limit int) (
 
 // GetList gets a list by its ID or UUID.
 func (c *Core) GetList(id int, uuid string) (models.List, error) {
-	var uu interface{}
+	var uu any
 	if uuid != "" {
 		uu = uuid
 	}
 
 	var res []models.List
-	queryStr, stmt := makeSearchQuery("", "", "", c.q.QueryLists)
-	if err := c.db.Select(&res, stmt, id, uu, queryStr, 0, 1); err != nil {
+	queryStr, stmt := makeSearchQuery("", "", "", c.q.QueryLists, nil)
+	if err := c.db.Select(&res, stmt, id, uu, queryStr, "", "", pq.StringArray{}, true, nil, 0, 1); err != nil {
 		c.log.Printf("error fetching lists: %v", err)
 		return models.List{}, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.lists}", "error", pqErrMsg(err)))
@@ -106,6 +113,33 @@ func (c *Core) GetListsByOptin(ids []int, optinType string) ([]models.List, erro
 		c.log.Printf("error fetching lists for opt-in: %s", pqErrMsg(err))
 		return nil, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.list}", "error", pqErrMsg(err)))
+	}
+
+	return out, nil
+}
+
+// GetListTypes returns lists by their IDs or UUIDs.
+// If ids is given, then the map returned has the list IDs as keys,
+// otherwise, they have UUIDs as the keys.
+// Note: This is a really weird and awkward API. Ideally, Go Generics
+// should've somehow supported generic struct methods.
+func (c *Core) GetListTypes(ids []int, uuids []string) (map[any]string, error) {
+	res := []listType{}
+
+	out := map[any]string{}
+	if err := c.q.GetListTypes.Select(&res, pq.Array(ids), pq.StringArray(uuids)); err != nil {
+		c.log.Printf("error fetching list types: %v", err)
+		return nil, echo.NewHTTPError(http.StatusInternalServerError,
+			c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.list}", "error", pqErrMsg(err)))
+	}
+
+	isIDs := ids != nil
+	for _, r := range res {
+		if isIDs {
+			out[r.ID] = r.Type
+		} else {
+			out[r.UUID] = r.Type
+		}
 	}
 
 	return out, nil

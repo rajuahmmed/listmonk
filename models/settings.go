@@ -1,23 +1,28 @@
 package models
 
+import "gopkg.in/volatiletech/null.v6"
+
 // Settings represents the app settings stored in the DB.
 type Settings struct {
-	AppSiteName           string   `json:"app.site_name"`
-	AppRootURL            string   `json:"app.root_url"`
-	AppLogoURL            string   `json:"app.logo_url"`
-	AppFaviconURL         string   `json:"app.favicon_url"`
-	AppFromEmail          string   `json:"app.from_email"`
-	AppNotifyEmails       []string `json:"app.notify_emails"`
-	EnablePublicSubPage   bool     `json:"app.enable_public_subscription_page"`
-	EnablePublicArchive   bool     `json:"app.enable_public_archive"`
-	SendOptinConfirmation bool     `json:"app.send_optin_confirmation"`
-	CheckUpdates          bool     `json:"app.check_updates"`
-	AppLang               string   `json:"app.lang"`
+	AppSiteName                   string   `json:"app.site_name"`
+	AppRootURL                    string   `json:"app.root_url"`
+	AppLogoURL                    string   `json:"app.logo_url"`
+	AppFaviconURL                 string   `json:"app.favicon_url"`
+	AppFromEmail                  string   `json:"app.from_email"`
+	AppNotifyEmails               []string `json:"app.notify_emails"`
+	EnablePublicSubPage           bool     `json:"app.enable_public_subscription_page"`
+	EnablePublicArchive           bool     `json:"app.enable_public_archive"`
+	EnablePublicArchiveRSSContent bool     `json:"app.enable_public_archive_rss_content"`
+	SendOptinConfirmation         bool     `json:"app.send_optin_confirmation"`
+	CheckUpdates                  bool     `json:"app.check_updates"`
+	AppLang                       string   `json:"app.lang"`
 
-	AppBatchSize     int `json:"app.batch_size"`
-	AppConcurrency   int `json:"app.concurrency"`
-	AppMaxSendErrors int `json:"app.max_send_errors"`
-	AppMessageRate   int `json:"app.message_rate"`
+	AppBatchSize             int    `json:"app.batch_size"`
+	AppConcurrency           int    `json:"app.concurrency"`
+	AppMaxSendErrors         int    `json:"app.max_send_errors"`
+	AppMessageRate           int    `json:"app.message_rate"`
+	CacheSlowQueries         bool   `json:"app.cache_slow_queries"`
+	CacheSlowQueriesInterval string `json:"app.cache_slow_queries_interval"`
 
 	AppMessageSlidingWindow         bool   `json:"app.message_sliding_window"`
 	AppMessageSlidingWindowDuration string `json:"app.message_sliding_window_duration"`
@@ -30,27 +35,52 @@ type Settings struct {
 	PrivacyAllowExport        bool     `json:"privacy.allow_export"`
 	PrivacyAllowWipe          bool     `json:"privacy.allow_wipe"`
 	PrivacyExportable         []string `json:"privacy.exportable"`
+	PrivacyRecordOptinIP      bool     `json:"privacy.record_optin_ip"`
 	DomainBlocklist           []string `json:"privacy.domain_blocklist"`
+	DomainAllowlist           []string `json:"privacy.domain_allowlist"`
 
-	SecurityEnableCaptcha bool   `json:"security.enable_captcha"`
-	SecurityCaptchaKey    string `json:"security.captcha_key"`
-	SecurityCaptchaSecret string `json:"security.captcha_secret"`
+	SecurityCaptcha struct {
+		Altcha struct {
+			Enabled    bool `json:"enabled"`
+			Complexity int  `json:"complexity"`
+		} `json:"altcha"`
+		HCaptcha struct {
+			Enabled bool   `json:"enabled"`
+			Key     string `json:"key"`
+			Secret  string `json:"secret"`
+		} `json:"hcaptcha"`
+	} `json:"security.captcha"`
 
-	UploadProvider             string `json:"upload.provider"`
-	UploadFilesystemUploadPath string `json:"upload.filesystem.upload_path"`
-	UploadFilesystemUploadURI  string `json:"upload.filesystem.upload_uri"`
-	UploadS3URL                string `json:"upload.s3.url"`
-	UploadS3PublicURL          string `json:"upload.s3.public_url"`
-	UploadS3AwsAccessKeyID     string `json:"upload.s3.aws_access_key_id"`
-	UploadS3AwsDefaultRegion   string `json:"upload.s3.aws_default_region"`
-	UploadS3AwsSecretAccessKey string `json:"upload.s3.aws_secret_access_key,omitempty"`
-	UploadS3Bucket             string `json:"upload.s3.bucket"`
-	UploadS3BucketDomain       string `json:"upload.s3.bucket_domain"`
-	UploadS3BucketPath         string `json:"upload.s3.bucket_path"`
-	UploadS3BucketType         string `json:"upload.s3.bucket_type"`
-	UploadS3Expiry             string `json:"upload.s3.expiry"`
+	OIDC struct {
+		Enabled           bool     `json:"enabled"`
+		ProviderURL       string   `json:"provider_url"`
+		ProviderName      string   `json:"provider_name"`
+		ClientID          string   `json:"client_id"`
+		ClientSecret      string   `json:"client_secret"`
+		AutoCreateUsers   bool     `json:"auto_create_users"`
+		DefaultUserRoleID null.Int `json:"default_user_role_id"`
+		DefaultListRoleID null.Int `json:"default_list_role_id"`
+	} `json:"security.oidc"`
+
+	SecurityCORSOrigins []string `json:"security.cors_origins"`
+
+	UploadProvider             string   `json:"upload.provider"`
+	UploadExtensions           []string `json:"upload.extensions"`
+	UploadFilesystemUploadPath string   `json:"upload.filesystem.upload_path"`
+	UploadFilesystemUploadURI  string   `json:"upload.filesystem.upload_uri"`
+	UploadS3URL                string   `json:"upload.s3.url"`
+	UploadS3PublicURL          string   `json:"upload.s3.public_url"`
+	UploadS3AwsAccessKeyID     string   `json:"upload.s3.aws_access_key_id"`
+	UploadS3AwsDefaultRegion   string   `json:"upload.s3.aws_default_region"`
+	UploadS3AwsSecretAccessKey string   `json:"upload.s3.aws_secret_access_key,omitempty"`
+	UploadS3Bucket             string   `json:"upload.s3.bucket"`
+	UploadS3BucketDomain       string   `json:"upload.s3.bucket_domain"`
+	UploadS3BucketPath         string   `json:"upload.s3.bucket_path"`
+	UploadS3BucketType         string   `json:"upload.s3.bucket_type"`
+	UploadS3Expiry             string   `json:"upload.s3.expiry"`
 
 	SMTP []struct {
+		Name          string              `json:"name"`
 		UUID          string              `json:"uuid"`
 		Enabled       bool                `json:"enabled"`
 		Host          string              `json:"host"`
@@ -80,14 +110,25 @@ type Settings struct {
 		MaxMsgRetries int    `json:"max_msg_retries"`
 	} `json:"messengers"`
 
-	BounceEnabled        bool   `json:"bounce.enabled"`
-	BounceEnableWebhooks bool   `json:"bounce.webhooks_enabled"`
-	BounceCount          int    `json:"bounce.count"`
-	BounceAction         string `json:"bounce.action"`
-	SESEnabled           bool   `json:"bounce.ses_enabled"`
-	SendgridEnabled      bool   `json:"bounce.sendgrid_enabled"`
-	SendgridKey          string `json:"bounce.sendgrid_key"`
-	BounceBoxes          []struct {
+	BounceEnabled        bool `json:"bounce.enabled"`
+	BounceEnableWebhooks bool `json:"bounce.webhooks_enabled"`
+	BounceActions        map[string]struct {
+		Count  int    `json:"count"`
+		Action string `json:"action"`
+	} `json:"bounce.actions"`
+	SESEnabled      bool   `json:"bounce.ses_enabled"`
+	SendgridEnabled bool   `json:"bounce.sendgrid_enabled"`
+	SendgridKey     string `json:"bounce.sendgrid_key"`
+	BouncePostmark  struct {
+		Enabled  bool   `json:"enabled"`
+		Username string `json:"username"`
+		Password string `json:"password"`
+	} `json:"bounce.postmark"`
+	BounceForwardEmail struct {
+		Enabled bool   `json:"enabled"`
+		Key     string `json:"key"`
+	} `json:"bounce.forwardemail"`
+	BounceBoxes []struct {
 		UUID          string `json:"uuid"`
 		Enabled       bool   `json:"enabled"`
 		Type          string `json:"type"`

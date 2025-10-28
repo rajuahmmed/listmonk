@@ -3,8 +3,10 @@ package main
 import (
 	"crypto/rand"
 	"fmt"
+	"net/url"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -15,12 +17,7 @@ var (
 
 // inArray checks if a string is present in a list of strings.
 func inArray(val string, vals []string) (ok bool) {
-	for _, v := range vals {
-		if v == val {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(vals, val)
 }
 
 // makeFilename sanitizes a filename (user supplied upload filenames).
@@ -32,6 +29,13 @@ func makeFilename(fName string) string {
 	// replace whitespace with "-"
 	name = regexpSpaces.ReplaceAllString(name, "-")
 	return filepath.Base(name)
+}
+
+// appendSuffixToFilename adds a string suffix to the filename while keeping the file extension.
+func appendSuffixToFilename(filename, suffix string) string {
+	ext := filepath.Ext(filename)
+	name := strings.TrimSuffix(filename, ext)
+	return fmt.Sprintf("%s_%s%s", name, suffix, ext)
 }
 
 // makeMsgTpl takes a page title, heading, and message and returns
@@ -89,13 +93,22 @@ func strHasLen(str string, min, max int) bool {
 	return len(str) >= min && len(str) <= max
 }
 
-// strSliceContains checks if a string is present in the string slice.
-func strSliceContains(str string, sl []string) bool {
-	for _, s := range sl {
-		if s == str {
-			return true
+// getQueryInts parses the list of given query param values into ints.
+func getQueryInts(param string, qp url.Values) ([]int, error) {
+	var out []int
+	if vals, ok := qp[param]; ok {
+		for _, v := range vals {
+			if v == "" {
+				continue
+			}
+
+			listID, err := strconv.Atoi(v)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, listID)
 		}
 	}
 
-	return false
+	return out, nil
 }

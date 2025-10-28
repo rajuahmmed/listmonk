@@ -5,9 +5,11 @@ import {
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import updateLocale from 'dayjs/plugin/updateLocale';
+import dayDuration from 'dayjs/plugin/duration';
 
 dayjs.extend(updateLocale);
 dayjs.extend(relativeTime);
+dayjs.extend(dayDuration);
 
 const reEmail = /(.+?)@(.+?)/ig;
 const prefKey = 'listmonk_pref';
@@ -68,7 +70,19 @@ export default class Utils {
     return out;
   };
 
-  duration = (start, end) => dayjs(end).from(dayjs(start), true);
+  duration = (start, end) => {
+    const a = dayjs(start);
+    const b = dayjs(end);
+    const d = dayjs.duration(Math.abs(b.diff(a)));
+
+    const parts = [
+      Math.floor(d.asDays()) && `${Math.floor(d.asDays())}d`,
+      d.hours() && `${d.hours()}h`,
+      d.minutes() && `${d.minutes()}m`,
+    ].filter(Boolean);
+
+    return `${b.isBefore(a) ? '-' : ''}${parts.join(' ')}`;
+  };
 
   // Simple, naive, e-mail address check.
   validateEmail = (e) => e.match(reEmail);
@@ -101,7 +115,7 @@ export default class Utils {
     }
 
     return out.toFixed(2) + pfx;
-  }
+  };
 
   formatNumber(v) {
     return this.intlNumFormat.format(v);
@@ -122,7 +136,7 @@ export default class Utils {
     }
 
     return ids.map((id) => parseInt(id, 10));
-  }
+  };
 
   // https://stackoverflow.com/a/12034334
   escapeHTML = (html) => html.replace(/[&<>"'`=/]/g, (s) => htmlEntities[s]);
@@ -160,11 +174,11 @@ export default class Utils {
     });
   };
 
-  toast = (msg, typ, duration) => {
+  toast = (msg, typ, duration, queue) => {
     Toast.open({
       message: this.escapeHTML(msg),
       type: !typ ? 'is-success' : typ,
-      queue: false,
+      queue,
       duration: duration || 3000,
       position: 'is-top',
       pauseOnHover: true,
@@ -178,7 +192,7 @@ export default class Utils {
   camelString = (str) => {
     const s = str.replace(/[-_\s]+(.)?/g, (match, chr) => (chr ? chr.toUpperCase() : ''));
     return s.substr(0, 1).toLowerCase() + s.substr(1);
-  }
+  };
 
   // camelKeys recursively camelCases all keys in a given object (array or {}).
   // For each key it traverses, it passes a dot separated key path to an optional testFunc() bool.
@@ -233,5 +247,5 @@ export default class Utils {
 
     p[key] = val;
     localStorage.setItem(prefKey, JSON.stringify(p));
-  }
+  };
 }

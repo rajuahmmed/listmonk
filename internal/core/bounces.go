@@ -1,7 +1,6 @@
 package core
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -10,7 +9,7 @@ import (
 	"github.com/lib/pq"
 )
 
-var bounceQuerySortFields = []string{"email", "campaign_name", "source", "created_at"}
+var bounceQuerySortFields = []string{"email", "campaign_name", "source", "created_at", "type"}
 
 // QueryBounces retrieves paginated bounce entries based on the given params.
 // It also returns the total number of bounce records in the DB.
@@ -41,7 +40,7 @@ func (c *Core) QueryBounces(campID, subID int, source, orderBy, order string, of
 // GetBounce retrieves bounce entries based on the given params.
 func (c *Core) GetBounce(id int) (models.Bounce, error) {
 	var out []models.Bounce
-	stmt := fmt.Sprintf(c.q.QueryBounces, "id", SortAsc)
+	stmt := strings.ReplaceAll(c.q.QueryBounces, "%order%", "id "+SortAsc)
 	if err := c.db.Select(&out, stmt, id, 0, 0, "", 0, 1); err != nil {
 		c.log.Printf("error fetching bounces: %v", err)
 		return models.Bounce{}, echo.NewHTTPError(http.StatusInternalServerError,
@@ -59,6 +58,11 @@ func (c *Core) GetBounce(id int) (models.Bounce, error) {
 
 // RecordBounce records a new bounce.
 func (c *Core) RecordBounce(b models.Bounce) error {
+	action, ok := c.consts.BounceActions[b.Type]
+	if !ok {
+		return echo.NewHTTPError(http.StatusBadRequest, c.i18n.Ts("globals.messages.invalidData")+": "+b.Type)
+	}
+
 	_, err := c.q.RecordBounce.Exec(b.SubscriberUUID,
 		b.Email,
 		b.CampaignUUID,
@@ -66,8 +70,8 @@ func (c *Core) RecordBounce(b models.Bounce) error {
 		b.Source,
 		b.Meta,
 		b.CreatedAt,
-		c.constants.MaxBounceCount,
-		c.constants.BounceAction)
+		action.Count,
+		action.Action)
 
 	if err != nil {
 		// Ignore the error if it complained of no subscriber.
@@ -82,14 +86,24 @@ func (c *Core) RecordBounce(b models.Bounce) error {
 	return err
 }
 
+// BlocklistBouncedSubscribers blocklists all bounced subscribers.
+func (c *Core) BlocklistBouncedSubscribers() error {
+	if _, err := c.q.BlocklistBouncedSubscribers.Exec(); err != nil {
+		c.log.Printf("error blocklisting bounced subscribers: %v", err)
+		return echo.NewHTTPError(http.StatusInternalServerError, c.i18n.Ts("subscribers.errorBlocklisting", "error", err.Error()))
+	}
+
+	return nil
+}
+
 // DeleteBounce deletes a list.
 func (c *Core) DeleteBounce(id int) error {
-	return c.DeleteBounces([]int{id})
+	return c.DeleteBounces([]int{id}, false)
 }
 
 // DeleteBounces deletes multiple lists.
-func (c *Core) DeleteBounces(ids []int) error {
-	if _, err := c.q.DeleteBounces.Exec(pq.Array(ids)); err != nil {
+func (c *Core) DeleteBounces(ids []int, all bool) error {
+	if _, err := c.q.DeleteBounces.Exec(pq.Array(ids), all); err != nil {
 		c.log.Printf("error deleting lists: %v", err)
 		return echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorDeleting", "name", "{globals.terms.list}", "error", pqErrMsg(err)))

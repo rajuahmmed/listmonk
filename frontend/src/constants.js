@@ -2,26 +2,37 @@ export const models = Object.freeze({
   serverConfig: 'serverConfig',
   lang: 'lang',
   dashboard: 'dashboard',
+  // This loading state is used across all contexts where lists are loaded
+  // via the instant "minimal" API.
   lists: 'lists',
+  // This is used only on the lists page where lists are loaded with full
+  // context (subscriber counts), which can be slow and expensive.
+  listsFull: 'listsFull',
   subscribers: 'subscribers',
   campaigns: 'campaigns',
   templates: 'templates',
   media: 'media',
   bounces: 'bounces',
+  users: 'users',
+  profile: 'profile',
+  userRoles: 'userRoles',
+  listRoles: 'listRoles',
   settings: 'settings',
   logs: 'logs',
   maintenance: 'maintenance',
 });
 
 // Ad-hoc URIs that are used outside of vuex requests.
-const rootURL = process.env.VUE_APP_ROOT_URL || '/';
-const baseURL = process.env.BASE_URL.replace(/\/$/, '');
+const rootURL = import.meta.env.VUE_APP_ROOT_URL || '/';
+const baseURL = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 export const uris = Object.freeze({
   previewCampaign: '/api/campaigns/:id/preview',
+  previewCampaignArchive: '/api/campaigns/:id/preview/archive',
   previewTemplate: '/api/templates/:id/preview',
   previewRawTemplate: '/api/templates/preview',
   exportSubscribers: '/api/subscribers/export',
+  errorEvents: '/api/events?type=error',
   base: `${baseURL}/static`,
   root: rootURL,
   static: `${baseURL}/static`,

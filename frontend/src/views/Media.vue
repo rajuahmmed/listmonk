@@ -1,84 +1,128 @@
 <template>
   <section class="media-files">
-    <h1 class="title is-4">{{ $t('media.title') }}
-      <span v-if="media.length > 0">({{ media.length }})</span>
-
+    <h1 class="title is-4">
+      {{ $t('media.title') }}
+      <span v-if="media.results && media.results.length > 0">({{ media.results.length }})</span>
       <span class="has-text-grey-light"> / {{ settings['upload.provider'] }}</span>
     </h1>
 
-    <b-loading :active="isProcessing || loading.media"></b-loading>
+    <b-loading :active="isProcessing || loading.media" />
 
-    <section class="wrap">
-      <form @submit.prevent="onSubmit" class="box">
-        <div>
-          <b-field :label="$t('media.uploadImage')">
-            <b-upload
-              v-model="form.files"
-              drag-drop
-              multiple
-              accept=".png,.jpg,.jpeg,.gif"
-              expanded>
-              <div class="has-text-centered section">
-                <p>
-                  <b-icon icon="file-upload-outline" size="is-large"></b-icon>
+    <section class="wrap gallery mt-6">
+      <div class="columns mb-4">
+        <div class="column">
+          <form @submit.prevent="onQueryMedia" class="search">
+            <div>
+              <b-field>
+                <b-input v-model="queryParams.query" name="query" expanded icon="magnify" ref="query" data-cy="query" />
+                <p class="controls">
+                  <b-button native-type="submit" type="is-primary" icon-left="magnify" data-cy="btn-query" />
                 </p>
-                <p>{{ $t('media.uploadHelp') }}</p>
-              </div>
-            </b-upload>
-          </b-field>
-          <div class="tags" v-if="form.files.length > 0">
-            <b-tag v-for="(f, i) in form.files" :key="i" size="is-medium"
-              closable @close="removeUploadFile(i)">
-              {{ f.name }}
-            </b-tag>
-          </div>
-          <div class="buttons">
-            <b-button native-type="submit" type="is-primary" icon-left="file-upload-outline"
-              :disabled="form.files.length === 0"
-              :loading="isProcessing">{{ $tc('media.upload') }}</b-button>
-          </div>
+              </b-field>
+            </div>
+          </form>
         </div>
-      </form>
-    </section>
+        <div class="column is-narrow">
+          <b-button @click="onToggleForm" icon-left="file-upload-outline" data-cy="btn-toggle-upload">
+            {{ $t('media.upload') }}
+          </b-button>
+        </div>
+      </div>
 
-    <section class="section gallery">
-      <div v-for="group in items" :key="group.title">
-        <h3 class="title is-5">{{ group.title }}</h3>
+      <b-collapse v-model="showUploadForm" animation="">
+        <form @submit.prevent="onSubmit" class="mb-6" data-cy="upload">
+          <div>
+            <b-field :label="$t('media.upload')">
+              <b-upload v-model="form.files" drag-drop multiple xaccept=".png,.jpg,.jpeg,.gif,.svg" expanded>
+                <div class="has-text-centered section">
+                  <p>
+                    <b-icon icon="file-upload-outline" size="is-large" />
+                  </p>
+                  <p>{{ $t('media.uploadHelp') }}</p>
+                </div>
+              </b-upload>
+            </b-field>
+            <div class="tags" v-if="form.files.length > 0">
+              <b-tag v-for="(f, i) in form.files" :key="i" size="is-medium" closable @close="removeUploadFile(i)">
+                {{ f.name }}
+              </b-tag>
+            </div>
+            <div class="buttons">
+              <b-button native-type="submit" type="is-primary" icon-left="file-upload-outline"
+                :disabled="form.files.length === 0" :loading="isProcessing">
+                {{ $tc('media.upload') }}
+              </b-button>
+            </div>
+          </div>
+        </form>
+      </b-collapse>
 
-        <div class="thumbs">
-          <div v-for="m in group.items" :key="m.id" class="box thumb">
-            <a @click="(e) => onMediaSelect(m, e)" :href="m.url" target="_blank">
-              <img :src="m.thumbUrl" :title="m.filename" />
+      <!-- Pagination -->
+      <div v-if="media.total > media.perPage" class="pagination-wrapper mt-5">
+        <b-pagination :total="media.total" :current.sync="media.page" :per-page="media.perPage"
+          @change="onPageChange" />
+      </div>
+
+      <div v-if="loading.media" class="has-text-centered py-6">
+        <b-loading :active="loading.media" />
+      </div>
+      <div v-else-if="media.results && media.results.length > 0" class="grid">
+        <div v-for="item in media.results" :key="item.id" class="item">
+          <div class="thumb">
+            <a @click="(e) => onMediaSelect(item, e)" :href="item.url" target="_blank" rel="noopener noreferer"
+              class="thumb-link">
+              <div class="thumb-container">
+                <img v-if="item.thumbUrl" :src="item.thumbUrl" :title="item.filename" :alt="item.filename" />
+                <div v-else class="thumb-placeholder">
+                  <span class="file-ext">
+                    {{ item.filename.split(".").pop().toUpperCase() }}
+                  </span>
+                </div>
+              </div>
             </a>
-            <span class="caption is-size-7" :title="m.filename">{{ m.filename }}</span>
-
-            <div class="actions has-text-right">
-              <a :href="m.url" target="_blank">
-                  <b-icon icon="arrow-top-right" size="is-small" />
-              </a>
-              <a href="#" @click.prevent="$utils.confirm(null, () => deleteMedia(m.id))">
-                  <b-icon icon="trash-can-outline" size="is-small" />
+            <div class="actions">
+              <a href="#" @click.prevent="$utils.confirm(null, () => onDeleteMedia(item.id))" data-cy="btn-delete"
+                :aria-label="$t('globals.buttons.delete')" class="delete-btn">
+                <b-icon icon="trash-can-outline" size="is-small" />
               </a>
             </div>
           </div>
+          <div class="info">
+            <p class="filename" :title="item.filename">{{ item.filename }}</p>
+            <p class="date">{{ $utils.niceDate(item.createdAt, false) }}</p>
+          </div>
         </div>
-        <hr />
+      </div>
+
+      <!-- Empty State -->
+      <div v-else-if="!loading.media">
+        <empty-placeholder />
+      </div>
+
+      <!-- Pagination -->
+      <div v-if="media.total > media.perPage" class="pagination-wrapper mt-5">
+        <b-pagination :total="media.total" :current.sync="media.page" :per-page="media.perPage"
+          @change="onPageChange" />
       </div>
     </section>
-
   </section>
 </template>
 
 <script>
 import Vue from 'vue';
 import { mapState } from 'vuex';
-import dayjs from 'dayjs';
+import EmptyPlaceholder from '../components/EmptyPlaceholder.vue';
 
 export default Vue.extend({
+  components: {
+    EmptyPlaceholder,
+  },
+
   name: 'Media',
 
   props: {
     isModal: Boolean,
+    type: { type: String, default: '' },
   },
 
   data() {
@@ -88,12 +132,35 @@ export default Vue.extend({
       },
       toUpload: 0,
       uploaded: 0,
+      showUploadForm: false,
+
+      queryParams: {
+        page: 1,
+        query: '',
+      },
     };
   },
 
   methods: {
     removeUploadFile(i) {
       this.form.files.splice(i, 1);
+    },
+
+    getMedia() {
+      this.$api.getMedia({
+        page: this.queryParams.page,
+        query: this.queryParams.query,
+      });
+    },
+
+    onToggleForm() {
+      this.showUploadForm = !this.showUploadForm;
+      this.$utils.setPref('media.upload', this.showUploadForm);
+    },
+
+    onQueryMedia() {
+      this.queryParams.page = 1;
+      this.getMedia();
     },
 
     onMediaSelect(m, e) {
@@ -122,9 +189,9 @@ export default Vue.extend({
       }
     },
 
-    deleteMedia(id) {
+    onDeleteMedia(id) {
       this.$api.deleteMedia(id).then(() => {
-        this.$api.getMedia();
+        this.getMedia();
       });
     },
 
@@ -135,8 +202,13 @@ export default Vue.extend({
         this.uploaded = 0;
         this.form.files = [];
 
-        this.$api.getMedia();
+        this.getMedia();
       }
+    },
+
+    onPageChange(p) {
+      this.queryParams.page = p;
+      this.getMedia();
     },
   },
 
@@ -149,33 +221,15 @@ export default Vue.extend({
       }
       return false;
     },
-
-    // Filters the list of media items by months into:
-    // [{"title": "Jan 2020", items: [...]}, ...]
-    items() {
-      const out = [];
-      if (!this.media || !(this.media instanceof Array)) {
-        return out;
-      }
-
-      let lastStamp = '';
-      let lastIndex = 0;
-      this.media.forEach((m) => {
-        const stamp = dayjs(m.createdAt).format('MMM YYYY');
-        if (stamp !== lastStamp) {
-          out.push({ title: stamp, items: [] });
-          lastStamp = stamp;
-          lastIndex = out.length;
-        }
-
-        out[lastIndex - 1].items.push(m);
-      });
-      return out;
-    },
   },
 
   mounted() {
+    this.$api.getSettings();
     this.$api.getMedia();
+
+    if (this.$utils.getPref('media.upload')) {
+      this.showUploadForm = true;
+    }
   },
 });
 </script>
