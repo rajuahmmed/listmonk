@@ -61,11 +61,11 @@
             }
 
             a {
-                color: #0055d4;
+                color: {{ ButtonBgColor }};
             }
-                a:hover {
-                    color: #111;
-                }
+            a:hover {
+                color: {{ ButtonHoverBgColor }};
+            }
             @media screen and (max-width: 600px) {
                 .wrap {
                     max-width: auto;
@@ -81,7 +81,7 @@
     <div class="wrap">
         <div class="header">
             {{ if ne LogoURL "" }}
-                <img src="{{ LogoURL }}" alt="listmonk" />
+                <img src="{{ LogoURL }}" alt="{{ SiteName }}" />
             {{ end }}
         </div>
 {{ end }}

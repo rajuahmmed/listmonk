@@ -755,7 +755,8 @@ func initMediaStore(ko *koanf.Koanf) media.Store {
 // initNotifs initializes the notifier with the system e-mail templates.
 func initNotifs(fs stuffbin.FileSystem, i *i18n.I18n, em *email.Emailer, u *UrlConfig, ko *koanf.Koanf) {
 	btnCfg := initButtonStyleConfig(ko)
-	tpls, err := stuffbin.ParseTemplatesGlob(initTplFuncs(i, u, btnCfg), fs, "/static/email-templates/*.html")
+	siteName := ko.String("app.site_name")
+	tpls, err := stuffbin.ParseTemplatesGlob(initTplFuncs(i, u, btnCfg, siteName), fs, "/static/email-templates/*.html")
 	if err != nil {
 		lo.Fatalf("error parsing e-mail notif templates: %v", err)
 	}
@@ -890,7 +891,7 @@ func initHTTPServer(cfg *Config, urlCfg *UrlConfig, i *i18n.I18n, fs stuffbin.Fi
 	})
 
 	btnCfg := initButtonStyleConfig(ko)
-	tpl, err := stuffbin.ParseTemplatesGlob(initTplFuncs(i, urlCfg, btnCfg), fs, "/public/templates/*.html")
+	tpl, err := stuffbin.ParseTemplatesGlob(initTplFuncs(i, urlCfg, btnCfg, cfg.SiteName), fs, "/public/templates/*.html")
 	if err != nil {
 		lo.Fatalf("error parsing public templates: %v", err)
 	}
@@ -1005,13 +1006,16 @@ func awaitReload(sigChan chan os.Signal, closerWait chan bool, closer func()) ch
 
 // initTplFuncs returns a generic template func map with custom template
 // functions and sprig template functions.
-func initTplFuncs(i *i18n.I18n, u *UrlConfig, btnCfg *ButtonStyleConfig) template.FuncMap {
+func initTplFuncs(i *i18n.I18n, u *UrlConfig, btnCfg *ButtonStyleConfig, siteName string) template.FuncMap {
 	funcs := template.FuncMap{
 		"RootURL": func() string {
 			return u.RootURL
 		},
 		"LogoURL": func() string {
 			return u.LogoURL
+		},
+		"SiteName": func() string {
+			return siteName
 		},
 		"Date": func(layout string) string {
 			if layout == "" {
