@@ -343,13 +343,12 @@ func (a *App) SubscriptionPrefs(c echo.Context) error {
 }
 
 // OptinPage renders the double opt-in confirmation page that subscribers
-// see when they click on the "Confirm subscription" button in double-optin
-// notifications.
+// see when they click on the "Confirm subscription" link in double-optin
+// notifications. The subscription is automatically confirmed upon visiting the link.
 func (a *App) OptinPage(c echo.Context) error {
 	var (
-		subUUID    = c.Param("subUUID")
-		confirm, _ = strconv.ParseBool(c.FormValue("confirm"))
-		req        optinReq
+		subUUID = c.Param("subUUID")
+		req     optinReq
 	)
 	if err := c.Bind(&req); err != nil {
 		return err
@@ -378,34 +377,25 @@ func (a *App) OptinPage(c echo.Context) error {
 			makeMsgTpl(a.i18n.T("public.noSubTitle"), "", a.i18n.Ts("public.noSubInfo")))
 	}
 
-	// Confirm.
-	if confirm {
-		meta := models.JSON{}
-		if a.cfg.Privacy.RecordOptinIP {
-			if h := c.Request().Header.Get("X-Forwarded-For"); h != "" {
-				meta["optin_ip"] = h
-			} else if h := c.Request().RemoteAddr; h != "" {
-				meta["optin_ip"] = strings.Split(h, ":")[0]
-			}
+	// Automatically confirm the subscription.
+	meta := models.JSON{}
+	if a.cfg.Privacy.RecordOptinIP {
+		if h := c.Request().Header.Get("X-Forwarded-For"); h != "" {
+			meta["optin_ip"] = h
+		} else if h := c.Request().RemoteAddr; h != "" {
+			meta["optin_ip"] = strings.Split(h, ":")[0]
 		}
-
-		// Confirm subscriptions in the DB.
-		if err := a.core.ConfirmOptionSubscription(subUUID, req.ListUUIDs, meta); err != nil {
-			a.log.Printf("error unsubscribing: %v", err)
-			return c.Render(http.StatusInternalServerError, tplMessage,
-				makeMsgTpl(a.i18n.T("public.errorTitle"), "", a.i18n.Ts("public.errorProcessingRequest")))
-		}
-
-		return c.Render(http.StatusOK, tplMessage,
-			makeMsgTpl(a.i18n.T("public.subConfirmedTitle"), "", a.i18n.Ts("public.subConfirmed")))
 	}
 
-	var out optinTpl
-	out.Lists = lists
-	out.SubUUID = subUUID
-	out.Title = a.i18n.T("public.confirmOptinSubTitle")
+	// Confirm subscriptions in the DB.
+	if err := a.core.ConfirmOptionSubscription(subUUID, req.ListUUIDs, meta); err != nil {
+		a.log.Printf("error confirming subscription: %v", err)
+		return c.Render(http.StatusInternalServerError, tplMessage,
+			makeMsgTpl(a.i18n.T("public.errorTitle"), "", a.i18n.Ts("public.errorProcessingRequest")))
+	}
 
-	return c.Render(http.StatusOK, "optin", out)
+	return c.Render(http.StatusOK, tplMessage,
+		makeMsgTpl(a.i18n.T("public.subConfirmedTitle"), "", a.i18n.Ts("public.subConfirmed")))
 }
 
 // SubscriptionFormPage handles subscription requests coming from public
