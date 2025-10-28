@@ -147,4 +147,10 @@ type Settings struct {
 	AdminCustomJS   string `json:"appearance.admin.custom_js"`
 	PublicCustomCSS string `json:"appearance.public.custom_css"`
 	PublicCustomJS  string `json:"appearance.public.custom_js"`
+
+	ButtonBgColor         string `json:"appearance.button.bg_color"`
+	ButtonTextColor       string `json:"appearance.button.text_color"`
+	ButtonHoverBgColor    string `json:"appearance.button.hover_bg_color"`
+	ButtonHoverTextColor  string `json:"appearance.button.hover_text_color"`
+	ButtonBorderRadius    string `json:"appearance.button.border_radius"`
 }

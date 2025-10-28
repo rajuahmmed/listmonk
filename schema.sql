@@ -288,7 +288,12 @@ INSERT INTO settings (key, value) VALUES
     ('appearance.admin.custom_css', '""'),
     ('appearance.admin.custom_js', '""'),
     ('appearance.public.custom_css', '""'),
-    ('appearance.public.custom_js', '""');
+    ('appearance.public.custom_js', '""'),
+    ('appearance.button.bg_color', '"#0055d4"'),
+    ('appearance.button.text_color', '"#ffffff"'),
+    ('appearance.button.hover_bg_color', '"#222222"'),
+    ('appearance.button.hover_text_color', '"#ffffff"'),
+    ('appearance.button.border_radius', '"3px"');
 
 -- bounces
 DROP TABLE IF EXISTS bounces CASCADE;

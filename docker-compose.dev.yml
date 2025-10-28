@@ -1,0 +1,59 @@
+# Docker Compose file for PostgreSQL and Mailpit only
+# Useful for local development when running listmonk directly on the host
+#
+# Usage:
+#   docker compose -f docker-compose.dev-services.yml up -d
+#
+# PostgreSQL: localhost:5432
+# Mailpit UI: http://localhost:8025
+# Mailpit SMTP: localhost:1025
+
+x-db-credentials: &db-credentials
+  POSTGRES_USER: &db-user listmonk
+  POSTGRES_PASSWORD: &db-password listmonk
+  POSTGRES_DB: &db-name listmonk
+
+services:
+  # PostgreSQL database
+  db:
+    image: postgres:17-alpine
+    container_name: listmonk_dev_db
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    networks:
+      - listmonk-dev
+    environment:
+      <<: *db-credentials
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U listmonk"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    volumes:
+      - type: volume
+        source: listmonk-dev-data
+        target: /var/lib/postgresql/data
+
+  # Mailpit - Modern mail testing tool
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: listmonk_dev_mailpit
+    restart: unless-stopped
+    ports:
+      - "1025:1025"  # SMTP server
+      - "8025:8025"  # Web UI
+    networks:
+      - listmonk-dev
+    environment:
+      MP_MAX_MESSAGES: 5000
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+
+networks:
+  listmonk-dev:
+    name: listmonk-dev
+
+volumes:
+  listmonk-dev-data:
+

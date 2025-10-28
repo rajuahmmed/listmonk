@@ -72,6 +72,15 @@ type UrlConfig struct {
 	ArchiveURL   string
 }
 
+// ButtonStyleConfig contains button style configuration for email templates.
+type ButtonStyleConfig struct {
+	BgColor        string `koanf:"bg_color"`
+	TextColor      string `koanf:"text_color"`
+	HoverBgColor   string `koanf:"hover_bg_color"`
+	HoverTextColor string `koanf:"hover_text_color"`
+	BorderRadius   string `koanf:"border_radius"`
+}
+
 // Config contains static, constant config values required by arbitrary handlers and functions.
 type Config struct {
 	SiteName                      string   `koanf:"site_name"`
@@ -407,7 +416,7 @@ func initSettings(query string, db *sqlx.DB, ko *koanf.Koanf) {
 func initUrlConfig(ko *koanf.Koanf) *UrlConfig {
 	root := strings.TrimSuffix(ko.String("app.root_url"), "/")
 
-	return &UrlConfig{
+	u := &UrlConfig{
 		RootURL:    root,
 		LogoURL:    ko.String("app.logo_url"),
 		FaviconURL: ko.String("app.favicon_url"),
@@ -431,6 +440,19 @@ func initUrlConfig(ko *koanf.Koanf) *UrlConfig {
 
 		// url.com/campaign/{campaign_uuid}/{subscriber_uuid}/px.png
 		ViewTrackURL: fmt.Sprintf("%s/campaign/%%s/%%s/px.png", root),
+	}
+
+	return u
+}
+
+// initButtonStyleConfig initializes button style configuration from settings.
+func initButtonStyleConfig(ko *koanf.Koanf) *ButtonStyleConfig {
+	return &ButtonStyleConfig{
+		BgColor:        ko.String("appearance.button.bg_color"),
+		TextColor:      ko.String("appearance.button.text_color"),
+		HoverBgColor:   ko.String("appearance.button.hover_bg_color"),
+		HoverTextColor: ko.String("appearance.button.hover_text_color"),
+		BorderRadius:   ko.String("appearance.button.border_radius"),
 	}
 }
 
@@ -732,7 +754,8 @@ func initMediaStore(ko *koanf.Koanf) media.Store {
 
 // initNotifs initializes the notifier with the system e-mail templates.
 func initNotifs(fs stuffbin.FileSystem, i *i18n.I18n, em *email.Emailer, u *UrlConfig, ko *koanf.Koanf) {
-	tpls, err := stuffbin.ParseTemplatesGlob(initTplFuncs(i, u), fs, "/static/email-templates/*.html")
+	btnCfg := initButtonStyleConfig(ko)
+	tpls, err := stuffbin.ParseTemplatesGlob(initTplFuncs(i, u, btnCfg), fs, "/static/email-templates/*.html")
 	if err != nil {
 		lo.Fatalf("error parsing e-mail notif templates: %v", err)
 	}
@@ -853,7 +876,7 @@ func initAbout(q *models.Queries, db *sqlx.DB) about {
 }
 
 // initHTTPServer sets up and runs the app's main HTTP server and blocks forever.
-func initHTTPServer(cfg *Config, urlCfg *UrlConfig, i *i18n.I18n, fs stuffbin.FileSystem, app *App) *echo.Echo {
+func initHTTPServer(cfg *Config, urlCfg *UrlConfig, i *i18n.I18n, fs stuffbin.FileSystem, app *App, ko *koanf.Koanf) *echo.Echo {
 	// Initialize the HTTP server.
 	var srv = echo.New()
 	srv.HideBanner = true
@@ -866,7 +889,8 @@ func initHTTPServer(cfg *Config, urlCfg *UrlConfig, i *i18n.I18n, fs stuffbin.Fi
 		}
 	})
 
-	tpl, err := stuffbin.ParseTemplatesGlob(initTplFuncs(i, urlCfg), fs, "/public/templates/*.html")
+	btnCfg := initButtonStyleConfig(ko)
+	tpl, err := stuffbin.ParseTemplatesGlob(initTplFuncs(i, urlCfg, btnCfg), fs, "/public/templates/*.html")
 	if err != nil {
 		lo.Fatalf("error parsing public templates: %v", err)
 	}
@@ -981,7 +1005,7 @@ func awaitReload(sigChan chan os.Signal, closerWait chan bool, closer func()) ch
 
 // initTplFuncs returns a generic template func map with custom template
 // functions and sprig template functions.
-func initTplFuncs(i *i18n.I18n, u *UrlConfig) template.FuncMap {
+func initTplFuncs(i *i18n.I18n, u *UrlConfig, btnCfg *ButtonStyleConfig) template.FuncMap {
 	funcs := template.FuncMap{
 		"RootURL": func() string {
 			return u.RootURL
@@ -1000,6 +1024,21 @@ func initTplFuncs(i *i18n.I18n, u *UrlConfig) template.FuncMap {
 		},
 		"Safe": func(safeHTML string) template.HTML {
 			return template.HTML(safeHTML)
+		},
+		"ButtonBgColor": func() string {
+			return btnCfg.BgColor
+		},
+		"ButtonTextColor": func() string {
+			return btnCfg.TextColor
+		},
+		"ButtonHoverBgColor": func() string {
+			return btnCfg.HoverBgColor
+		},
+		"ButtonHoverTextColor": func() string {
+			return btnCfg.HoverTextColor
+		},
+		"ButtonBorderRadius": func() string {
+			return btnCfg.BorderRadius
 		},
 	}
 

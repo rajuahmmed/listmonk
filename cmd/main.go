@@ -285,7 +285,7 @@ func main() {
 	}
 
 	// Start the app server.
-	srv := initHTTPServer(cfg, urlCfg, i18n, fs, app)
+	srv := initHTTPServer(cfg, urlCfg, i18n, fs, app, ko)
 
 	// =========================================================================
 	// Wait for the reload signal with a callback to gracefully shut down resources.
